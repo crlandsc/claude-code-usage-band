@@ -1,0 +1,12 @@
+{
+  "name": "crlandsc",
+  "owner": { "name": "Christopher Landschoot", "url": "https://github.com/crlandsc" },
+  "description": "Claude Code mods by Christopher Landschoot.",
+  "plugins": [
+    {
+      "name": "usage-band",
+      "source": "./",
+      "description": "A slim band above the Claude Code prompt: 5-hour and weekly limits, context and prompt cache at a glance."
+    }
+  ]
+}

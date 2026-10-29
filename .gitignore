@@ -1,0 +1,4 @@
+# Written by Claude Code on every load
+.claude-plugin/types/
+.claude/
+.DS_Store

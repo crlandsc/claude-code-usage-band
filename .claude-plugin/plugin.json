@@ -1,0 +1,11 @@
+{
+  "name": "usage-band",
+  "version": "1.0.0",
+  "description": "A slim band above the Claude Code prompt: 5-hour and weekly limits, context and prompt cache at a glance.",
+  "author": { "name": "Christopher Landschoot", "url": "https://github.com/crlandsc" },
+  "homepage": "https://github.com/crlandsc/claude-code-usage-band",
+  "repository": "https://github.com/crlandsc/claude-code-usage-band",
+  "license": "MIT",
+  "keywords": ["usage", "rate-limit", "context", "prompt-cache", "status", "mod", "claude-code"],
+  "types": "./types/index.d.ts"
+}
