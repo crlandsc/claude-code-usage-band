@@ -31,6 +31,31 @@ let motion: Timer | undefined
 // Whether the card glides open (`on`) or appears at once (`off`, the default: the
 // band redraws in steps, so the glide stutters), set by /usage-band anim.
 let glide = false
+// Fixed sample figures for screenshots, set by /usage-band demo; never kept across reloads.
+let demo = false
+
+const MIN = 60_000
+const at = (now: number, ms: number) => new Date(now + ms).toISOString()
+// One of each colour: the 5-hour limit near its end (red), the week early (green), context at 70% (yellow), a warm cache.
+const DEMO = {
+  limits: (now: number): Limit[] => [
+    { kind: 'five_hour', percentUsed: 93, resetsAt: at(now, 42 * MIN) },
+    { kind: 'seven_day', percentUsed: 31, resetsAt: at(now, (4 * 24 + 8) * 60 * MIN) },
+  ],
+  context: { tokens: 702_000, window: 1_000_000, percent: 70 } as Context,
+  cache: (now: number): Cache => ({ lastAt: now - 18 * MIN, ttlMs: CACHE_TTL }),
+  breakdown: {
+    rows: [
+      { name: 'Messages', tokens: 612_000, color: 'msg' },
+      { name: 'MCP tools', tokens: 32_000, color: 'mcp' },
+      { name: 'System tools', tokens: 31_000, color: 'sys' },
+      { name: 'System prompt', tokens: 11_000, color: 'prompt' },
+      { name: 'Other', tokens: 16_000, color: 'grey' },
+    ],
+    free: 265_000,
+    compactAt: 967_000,
+  } as Breakdown,
+}
 
 const keepLimits = (list: readonly SessionRateLimit[]): Limit[] =>
   list.map(l => ({ kind: l.kind, percentUsed: l.percentUsed, resetsAt: l.resetsAt }))
@@ -102,6 +127,11 @@ export const register: Register = on => {
 
   on('command.run', { command: COMMAND }, async ($, e) => {
     const [what, value] = e.args.trim().split(/\s+/)
+    if (what === 'demo' && (value === 'on' || value === 'off')) {
+      demo = value === 'on'
+      await $.ui.invalidate('ui.render')
+      return { text: `Demo figures ${value}.` }
+    }
     if (what !== 'anim' || (value !== 'on' && value !== 'off')) {
       return { text: `Card animation is ${glide ? 'on' : 'off'}. Use /usage-band anim on or /usage-band anim off.` }
     }
@@ -150,12 +180,12 @@ export const register: Register = on => {
     const ui = $.ui.resolve(e)
     const { Box, Button, Text } = ui
     const now = await $.clock.now()
-    const ls = await read($, limits)
-    const ctx = await read($, context)
+    const ls = demo ? DEMO.limits(now) : await read($, limits)
+    const ctx = demo ? DEMO.context : await read($, context)
     if (ls.length === 0 && !ctx) return next(e)
 
     const figs = figuresOf(ls, ctx, now)
-    const c = await read($, cache)
+    const c = demo ? DEMO.cache(now) : await read($, cache)
     const w = warmthOf(c, now)
     const cacheText = w ? (w.warmth === 'cold' ? 'cold' : `${w.mins}m`) : ''
 
@@ -219,7 +249,7 @@ export const register: Register = on => {
 
     if (f.t <= 0) return row
 
-    const b = await read($, breakdown)
+    const b = demo ? DEMO.breakdown : await read($, breakdown)
     const window = ctx?.window ?? 0
     const ctxFig = figs[figs.length - 1]
     const ago = c ? (now - c.lastAt < 60_000 ? 'just now' : `${timeLeft(now, c.lastAt)} ago`) : ''

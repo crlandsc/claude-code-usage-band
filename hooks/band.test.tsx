@@ -172,6 +172,21 @@ describe('band', () => {
     await ui.unmount()
   })
 
+  test('/usage-band demo on shows one figure of each colour', async ($, on) => {
+    engine(on)
+    on('ui.invalidate', () => ({ value: undefined }))
+    await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+    await $.command.run({ kind: 'plugin', name: 'usage-band', command: 'usage-band', args: 'demo on' } as never)
+
+    const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
+    expect((await ui.find({ type: 'Text', text: /93%/ }))?.text).toBe(' 93%')
+    expect((await ui.find({ type: 'Text', text: /31%/ }))?.text).toBe(' 31%')
+    expect((await ui.find({ type: 'Text', text: /70%/ }))?.text).toBe(' 70%')
+    expect((await ui.find({ type: 'Text', text: /42m/ }))?.text).toBe(' 42m')
+    await ui.unmount()
+    await $.command.run({ kind: 'plugin', name: 'usage-band', command: 'usage-band', args: 'demo off' } as never)
+  })
+
   test('terminal: the same facts as text', async ($, on) => {
     engine(on)
     await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
