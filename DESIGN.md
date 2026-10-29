@@ -18,6 +18,8 @@ Why the band looks and behaves as it does, and what the Claude Code desktop app 
 
 The chevron opens a card above the row, so the row never moves. Context on the left: tokens of the window, percent, the auto-compact point, a bar and a legend in the colours of the app's own /context panel (Messages blue, MCP tools orange, System tools teal, System prompt amber, the rest grey), with the auto-compact buffer at the bar's right end. Cache on the right: warm or cold, time left, a bar of the hour left, last reply, tokens cached.
 
+Context takes two thirds of the card's width and cache the rest. Both bars are a fixed 5 px thick at any length: they are laid out in percentages with no viewBox and drawn with an explicit `height`, so they stretch to their column without thickening. A bar with a viewBox scales its thickness with its width, which is why the old context bar came out thinner than the cache bar.
+
 The card opens and shuts at once. `/usage-band anim on` steps its height every 16 ms over 240 ms instead; it reads as choppy, because the band redraws whole each step.
 
 ## What the desktop band takes

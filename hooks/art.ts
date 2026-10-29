@@ -34,30 +34,29 @@ export const ring = (percent: number, shade: Shade) => {
   )
 }
 
-const BAR_H = 8
+/** Every bar's thickness in CSS pixels, whatever its length. */
+export const BAR_H = 5
 
 /**
  * A bar with rounded ends: coloured parts laid left to right over the track, each
- * a share (0 to 1) of the whole. Drawn `width` wide and scaled down to its slot,
- * so pass a width a little more than the slot can be.
+ * a share (0 to 1) of the whole. Laid out in percentages with no viewBox, so it
+ * fills its slot's width at a fixed BAR_H thickness instead of scaling.
  */
-export const bar = (parts: { share: number; slot: string }[], width: number) => {
+export const bar = (parts: { share: number; slot: string }[]) => {
   let x = 0
   const fills = parts
     .map(p => {
-      const w = Math.max(0, Math.min(1, p.share)) * width
-      const r = `<rect x="${x.toFixed(1)}" width="${w.toFixed(1)}" height="${BAR_H}" style="fill:var(--${p.slot})"/>`
+      const w = Math.max(0, Math.min(1, p.share)) * 100
+      const r = `<rect x="${x.toFixed(2)}%" width="${w.toFixed(2)}%" height="${BAR_H}" style="fill:var(--${p.slot})"/>`
       x += w
       return r
     })
     .join('')
 
-  return svg(
-    width,
-    BAR_H,
-    `0 0 ${width} ${BAR_H}`,
-    `<clipPath id="ends"><rect width="${width}" height="${BAR_H}" rx="${BAR_H / 2}"/></clipPath>` +
-      `<g clip-path="url(#ends)"><rect width="${width}" height="${BAR_H}" style="fill:var(--track)"/>${fills}</g>`,
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="${BAR_H}">${PALETTE}` +
+    `<clipPath id="ends"><rect width="100%" height="${BAR_H}" rx="${BAR_H / 2}"/></clipPath>` +
+    `<g clip-path="url(#ends)"><rect width="100%" height="${BAR_H}" style="fill:var(--track)"/>${fills}</g></svg>`
   )
 }
 

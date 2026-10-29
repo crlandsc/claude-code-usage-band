@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, SessionContextUsage, SessionRateLimit, Timer } from 'claude-code'
 
 import type { Breakdown, Cache, Context, Fold, Limit } from '../types'
-import { bar, chevron, ring, robotCold, robotWarm, swatch } from './art.ts'
+import { BAR_H, bar, chevron, ring, robotCold, robotWarm, swatch } from './art.ts'
 import { ringOf, termKey, textOf, warmthShade } from './colour.ts'
 import { CACHE_TTL, ease, figuresOf, pct, timeLeft, tok, warmthOf } from './format.ts'
 
@@ -16,10 +16,8 @@ const FOLD_KEY = 'usage-band-fold'
 const CARD_ROWS = 4
 const OPEN_MS = 240
 const FRAME_MS = 16
-/** Pixels per cell the bars are drawn at; they scale down to fit. */
-const CELL_PX = 12
-// Wide enough for "CACHE warm cold in 59m" on one line at footnote size.
-const CACHE_COLS = 36
+// The card's split: context takes two thirds, cache the rest.
+const CONTEXT_WIDTH = '66%'
 
 const limits = atom({ plugin: 'usage-band', key: 'limits' } as const, [] as Limit[])
 const context = atom({ plugin: 'usage-band', key: 'context' } as const, null as Context | null)
@@ -253,7 +251,6 @@ export const register: Register = on => {
     const window = ctx?.window ?? 0
     const ctxFig = figs[figs.length - 1]
     const ago = c ? (now - c.lastAt < 60_000 ? 'just now' : `${timeLeft(now, c.lastAt)} ago`) : ''
-    const barPx = Math.max(240, e.props.bodyColumns * CELL_PX)
     // Used categories from the left, the auto-compact buffer at the right end, as /context draws it.
     const used = (b?.rows ?? []).map(r => ({ share: window > 0 ? r.tokens / window : 0, slot: r.color }))
     const buffer = b?.compactAt && window > 0 ? Math.max(0, window - b.compactAt) / window : 0
@@ -261,16 +258,16 @@ export const register: Register = on => {
     const left = w && c ? Math.max(0, (c.lastAt + c.ttlMs - now) / c.ttlMs) : 0
 
     const body = (
-      <Box flexDirection="row" paddingX={1} paddingTop={0.5} paddingBottom={0.5}>
-        <Box flexGrow={1} flexDirection="column" marginRight={2}>
+      <Box flexDirection="row" paddingX={1} paddingTop={0.5} paddingBottom={1}>
+        <Box width={CONTEXT_WIDTH} flexShrink={0} flexDirection="column" marginRight={2}>
           <Box flexDirection="row">
             <Text size="caption" weight="semibold" color="inactive">CONTEXT  </Text>
             <Text size="footnote">{ctx?.tokens ? `${tok(ctx.tokens)} of ${tok(window)} ` : ''}</Text>
             <Text size="footnote" weight="semibold" color={textOf(ringOf(ctxFig.percent ?? 0))}>{pct(ctxFig.percent)}</Text>
             {b?.compactAt ? <Text size="footnote" color="inactive"> · auto-compacts at {tok(b.compactAt)}</Text> : null}
           </Box>
-          <Box flexDirection="row" marginTop={0.25} marginBottom={0.25}>
-            <Svg source={bar(parts, barPx)} alt={`Context ${pct(ctxFig.percent)} used, by category`} />
+          <Box flexDirection="column" marginTop={0.25} marginBottom={0.25}>
+            <Svg source={bar(parts)} alt={`Context ${pct(ctxFig.percent)} used, by category`} height={BAR_H} />
           </Box>
           <Box flexDirection="row" flexWrap="wrap">
             {(b?.rows ?? []).map(r => (
@@ -291,14 +288,14 @@ export const register: Register = on => {
           </Box>
         </Box>
         {w && c ? (
-          <Box width={CACHE_COLS} flexShrink={0} flexDirection="column">
+          <Box flexGrow={1} flexShrink={1} minWidth={0} flexDirection="column">
             <Box flexDirection="row">
               <Text size="caption" weight="semibold" color="inactive">CACHE  </Text>
               <Text size="footnote" weight="semibold" color={textOf(warmthShade(w.warmth))}>{w.warmth === 'cold' ? 'cold' : 'warm'}</Text>
               {w.warmth === 'cold' ? null : <Text size="footnote" color="inactive"> cold in {w.mins}m</Text>}
             </Box>
-            <Box flexDirection="row" marginTop={0.25} marginBottom={0.25}>
-              <Svg source={bar([{ share: left, slot: w.warmth }], CACHE_COLS * CELL_PX)} alt={`Cache, ${Math.round(left * 100)}% of the hour left`} />
+            <Box flexDirection="column" marginTop={0.25} marginBottom={0.25}>
+              <Svg source={bar([{ share: left, slot: w.warmth }])} alt={`Cache, ${Math.round(left * 100)}% of the hour left`} height={BAR_H} />
             </Box>
             <Text size="footnote" color="inactive">last reply {ago}{ctx?.tokens ? ` · ${tok(ctx.tokens)} cached` : ''}</Text>
           </Box>
