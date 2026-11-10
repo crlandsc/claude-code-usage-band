@@ -4,7 +4,7 @@ import type { EngineInterface, Register, SessionContextUsage, SessionRateLimit, 
 import type { Breakdown, Cache, Context, Fold, Limit } from '../types'
 import { BAR_H, bar, chevron, ring, robotCold, robotWarm, swatch } from './art.ts'
 import { ringOf, termKey, textOf, warmthShade } from './colour.ts'
-import { CACHE_TTL, ease, figuresOf, pct, timeLeft, tok, warmthOf } from './format.ts'
+import { CACHE_TTL, contextParts, ease, figuresOf, pct, timeLeft, tok, warmthOf } from './format.ts'
 
 // A band above the prompt: rings for the 5-hour limit, the weekly limit and
 // context, then a robot for the prompt cache. The chevron grows a card up out
@@ -18,6 +18,15 @@ const OPEN_MS = 240
 const FRAME_MS = 16
 // The card's split: context takes two thirds, cache the rest.
 const CONTEXT_WIDTH = '66%'
+// The row's context is a bar while the band has room for it, a ring otherwise.
+// Widths are in cells; the band reports its own (bodyColumns). From BAR_COLUMNS
+// up, the row stays on one line and the bar shrinks from BAR_MAX to fit; below
+// it, the bar becomes a ring and the row wraps as it needs. BAR_COLUMNS is where
+// the bar is as short as it should get (tuned with Chris in the app, 2026-11-10).
+// BAR_MIN only keeps the bar from vanishing when the figures run long.
+const BAR_COLUMNS = 56
+const BAR_MIN = 2
+const BAR_MAX = 26
 
 const limits = atom({ plugin: 'usage-band', key: 'limits' } as const, [] as Limit[])
 const context = atom({ plugin: 'usage-band', key: 'context' } as const, null as Context | null)
@@ -117,6 +126,7 @@ export const register: Register = on => {
     const u = await $.session.usage()
     await update($, limits, () => keepLimits(u.rateLimits))
     await update($, context, () => keepContext(u.context))
+    void measureBreakdown($)
     // Redraw each minute so times left and the cache's warmth stay current.
     $.clock.every(60_000, () => $.ui.invalidate('ui.render'))
 
@@ -143,7 +153,7 @@ export const register: Register = on => {
     if (e.changed.includes('rateLimits')) await update($, limits, () => keepLimits(e.rateLimits))
     if (e.changed.includes('context')) {
       await update($, context, () => keepContext(e.context))
-      if ((await read($, fold)).open) void measureBreakdown($)
+      void measureBreakdown($)
     }
 
     return next(e)
@@ -210,20 +220,35 @@ export const register: Register = on => {
 
     const { Svg } = ui
     const f = await read($, fold)
+    const b = demo ? DEMO.breakdown : await read($, breakdown)
+    const window = ctx?.window ?? 0
+    const parts = contextParts(b, window, (ctx?.percent ?? 0) / 100)
+    // The bar when the band has room for it beside everything else, else a ring.
+    const wide = !!ctx && e.props.bodyColumns >= BAR_COLUMNS
+    // In bar mode the row stays on one line and only the bar gives way as the band narrows. Boxes
+    // never shrink below their content unless given minWidth 0, so only the row and the context
+    // figure take it. Everything else, the gaps (a parent's gap, which never shrinks, rather than
+    // margins) and the chevron hold their size; the bar stops at BAR_MIN.
 
     const row = (
       <Box key="row" flexDirection="row" alignItems="center" paddingLeft={1}>
-        <Box flexGrow={1} flexDirection="row" flexWrap="wrap" alignItems="center">
+        <Box flexGrow={1} flexShrink={1} minWidth={0} flexDirection="row" flexWrap={wide ? 'nowrap' : 'wrap'} alignItems="center" columnGap={2}>
           {figs.map(g => (
-            <Box key={g.label} flexDirection="row" alignItems="center" marginRight={2}>
+            <Box key={g.label} flexDirection="row" alignItems="center" {...(wide && g.label === 'ctx' ? { flexShrink: 1, minWidth: 0 } : { flexShrink: 0 })}>
               <Text size="footnote" color="inactive">{g.label} </Text>
-              <Svg source={ring(g.percent ?? 0, ringOf(g.percent ?? 0))} alt={`${g.name} ${pct(g.percent)} used`} width={14} height={14} />
+              {wide && g.label === 'ctx' ? (
+                <Box width={BAR_MAX} minWidth={BAR_MIN} flexShrink={1} flexDirection="column">
+                  <Svg source={bar(parts)} alt={`${g.name} ${pct(g.percent)} used, by category`} height={BAR_H} />
+                </Box>
+              ) : (
+                <Svg source={ring(g.percent ?? 0, ringOf(g.percent ?? 0))} alt={`${g.name} ${pct(g.percent)} used`} width={14} height={14} />
+              )}
               <Text size="footnote" weight="semibold" color={textOf(ringOf(g.percent ?? 0))}> {pct(g.percent)}</Text>
               {g.extra ? <Text size="footnote" color="inactive"> {g.extra}</Text> : null}
             </Box>
           ))}
           {w ? (
-            <Box key="cache" flexDirection="row" alignItems="center">
+            <Box key="cache" flexDirection="row" alignItems="center" flexShrink={0}>
               <Svg
                 source={w.warmth === 'cold' ? robotCold() : robotWarm(w.warmth)}
                 alt={w.warmth === 'cold' ? 'Prompt cache cold' : `Prompt cache warm, ${w.mins} minutes left`}
@@ -236,7 +261,7 @@ export const register: Register = on => {
           ) : null}
         </Box>
         {/* A Button cannot hold a drawing, so a blank Button lies over the chevron and takes the press. */}
-        <Box position="relative" width={3} height={1} alignItems="center" justifyContent="center">
+        <Box position="relative" width={3} height={1} flexShrink={0} alignItems="center" justifyContent="center">
           <Svg source={chevron(!f.open)} alt={f.open ? 'Hide details' : 'Show details'} width={10} height={10} />
           <Box position="absolute" top={0} left={0} right={0} bottom={0} alignItems="center" justifyContent="center">
             <Button key={FOLD_KEY} plain label="   " onPress={() => void toggle($)} />
@@ -247,14 +272,8 @@ export const register: Register = on => {
 
     if (f.t <= 0) return row
 
-    const b = demo ? DEMO.breakdown : await read($, breakdown)
-    const window = ctx?.window ?? 0
     const ctxFig = figs[figs.length - 1]
     const ago = c ? (now - c.lastAt < 60_000 ? 'just now' : `${timeLeft(now, c.lastAt)} ago`) : ''
-    // Used categories from the left, the auto-compact buffer at the right end, as /context draws it.
-    const used = (b?.rows ?? []).map(r => ({ share: window > 0 ? r.tokens / window : 0, slot: r.color }))
-    const buffer = b?.compactAt && window > 0 ? Math.max(0, window - b.compactAt) / window : 0
-    const parts = [...used, { share: Math.max(0, 1 - buffer - used.reduce((n, u) => n + u.share, 0)), slot: 'track' }, { share: buffer, slot: 'buf' }]
     const left = w && c ? Math.max(0, (c.lastAt + c.ttlMs - now) / c.ttlMs) : 0
 
     const body = (

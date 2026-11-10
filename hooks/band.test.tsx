@@ -1,7 +1,7 @@
 import type { On, SessionRateLimit } from 'claude-code'
 import { describe, expect, mock, test } from 'claude-code/testing'
 import { contrast, ringOf, textOf } from './colour.ts'
-import { ease, figuresOf, timeLeft, tok, warmthOf } from './format.ts'
+import { contextParts, ease, figuresOf, timeLeft, tok, warmthOf } from './format.ts'
 
 const MIN = 60_000
 const HOUR = 60 * MIN
@@ -65,6 +65,23 @@ describe('format', () => {
     ])
   })
 
+  test('context parts: used categories, the free track, the auto-compact buffer at the right end', () => {
+    const b = {
+      rows: [
+        { name: 'Messages', tokens: 612_000, color: 'msg' },
+        { name: 'MCP tools', tokens: 32_000, color: 'mcp' },
+      ],
+      free: 265_000,
+      compactAt: 967_000,
+    }
+    const parts = contextParts(b, 1e6)
+    expect(parts.map(p => p.slot)).toEqual(['msg', 'mcp', 'track', 'buf'])
+    expect(parts.map(p => Math.round(p.share * 1000))).toEqual([612, 32, 323, 33])
+    expect(Math.abs(parts.reduce((n, p) => n + p.share, 0) - 1)).toBeLessThan(1e-9)
+    // Before the breakdown is measured, the used share stands in as one part.
+    expect(contextParts(null, 1e6, 0.26)).toEqual([{ share: 0.26, slot: 'msg' }])
+  })
+
   test('ease starts and ends at rest', () => {
     expect(ease(0)).toBe(0)
     expect(ease(1)).toBe(1)
@@ -118,6 +135,10 @@ const engine = (on: On) => {
   return clock
 }
 
+// The alt text of every drawing in a mounted band.
+const alts = async (ui: { findAll: (q: { type: string }) => Promise<{ props: Record<string, unknown> }[]> }) =>
+  (await ui.findAll({ type: 'Svg' })).map(n => n.props.alt)
+
 describe('band', () => {
   test('desktop: rings for 5h, weekly and context, then the cache robot', async ($, on) => {
     engine(on)
@@ -136,6 +157,24 @@ describe('band', () => {
     await ui.unmount()
   })
 
+  test('context is a bar while the band has room, a ring when it is narrow', async ($, on) => {
+    engine(on)
+    await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+
+    const wide = await $.ui.mount({ ...BAND, surface: 'desktop' })
+    await wide.drawn()
+    expect(await alts(wide)).toContain('Context 26% used, by category')
+    expect((await wide.find({ type: 'Text', text: /26%/ }))?.text).toBe(' 26%')
+    expect((await wide.find({ type: 'Text', text: /264k/ }))?.text).toBe(' 264k')
+    await wide.unmount()
+
+    const narrow = await $.ui.mount({ ...BAND, props: { ...BAND.props, bodyColumns: 40 }, surface: 'desktop' })
+    await narrow.drawn()
+    expect(await alts(narrow)).toContain('Context 26% used')
+    expect(await alts(narrow)).not.toContain('Context 26% used, by category')
+    await narrow.unmount()
+  })
+
   test('with anim on, the chevron grows the card over a quarter second, then shrinks it back', async ($, on) => {
     const clock = engine(on)
     await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
@@ -152,7 +191,7 @@ describe('band', () => {
     expect((await ui.find({ type: 'Text', text: /auto-compacts/ }))?.text).toBe(' · auto-compacts at 967k')
     expect((await ui.find({ type: 'Text', text: /Messages/ }))?.text).toBe(' Messages ')
     expect(await ui.find({ type: 'Button' })).toBeDefined()
-    // Three rings, the chevron, the context bar, five legend swatches (no cache yet).
+    // Two rings, the row's context bar, the chevron, the card's context bar, five legend swatches (no cache yet).
     expect((await ui.findAll({ type: 'Svg' })).length).toBe(10)
 
     await ui.press({ key: 'usage-band-fold' })

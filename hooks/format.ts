@@ -1,4 +1,4 @@
-import type { Cache, Context, Limit } from '../types'
+import type { Breakdown, Cache, Context, Limit } from '../types'
 
 const MIN = 60_000
 const HOUR = 60 * MIN
@@ -60,6 +60,20 @@ export const warmthOf = (cache: Cache | null, now: number): { warmth: Warmth; mi
 }
 
 export const CACHE_TTL = HOUR
+
+/**
+ * The context bar's parts, left to right: the used categories, the free track,
+ * then the auto-compact buffer at the right end, as /context draws it. Shares are
+ * of the whole window. Before the breakdown is measured, `fallback` (the used
+ * share) stands in for it as one part.
+ */
+export const contextParts = (b: Breakdown | null, window: number, fallback = 0) => {
+  if (!b || window <= 0) return [{ share: Math.min(Math.max(fallback, 0), 1), slot: 'msg' }]
+  const used = b.rows.map(r => ({ share: r.tokens / window, slot: r.color }))
+  const buffer = b.compactAt ? Math.max(0, window - b.compactAt) / window : 0
+
+  return [...used, { share: Math.max(0, 1 - buffer - used.reduce((n, u) => n + u.share, 0)), slot: 'track' }, { share: buffer, slot: 'buf' }]
+}
 
 /** Smooth in and out, so the card eases at both ends of its travel. */
 export const ease = (t: number) => (t < 0.5 ? 4 * t ** 3 : 1 - (-2 * t + 2) ** 3 / 2)

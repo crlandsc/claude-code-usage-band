@@ -4,14 +4,15 @@ Why the band looks and behaves as it does, and what the Claude Code desktop app 
 
 ## Row
 
-`5h ◔ 63% 1h30m · wk ◕ 84% 2d4h · ctx ◔ 26% 264k · 🤖 42m  ⌃`
+`5h ◔ 63% 1h30m · wk ◕ 84% 2d4h · ctx ▬▬── 26% 264k · 🤖 42m  ⌃`
 
 - Rings (14 px drawings), a bold percent, then the time left (always) or the context tokens, faint.
+- Context is a small copy of the card's bar while the band is at least 56 cells wide (`bodyColumns`), so it reads apart from the two limits at a glance. The row then stays on one line and only the bar gives way as the window narrows, from 26 cells down; below 56 it becomes a ring like the others and the row wraps. The spacing is the row's `columnGap`, not margins (the app squeezes margins), and only the bar and its row take `minWidth={0}`, since a box never shrinks below its content without it.
 - Order: 5-hour, weekly, context, cache. Context is measured against the full window; the auto-compact point is in the card.
 - Colour (`hooks/colour.ts`): green to 60%, then a smooth OKLCH blend through yellow (70), amber (80) and orange (85) to red at 90%. Light-mode rings are bright (the app's own `#F2A503` and `#F47230` among them); dark mode uses softer shades of the same hues.
 - Cache: a bobbing, blinking robot, green while warm, orange in the last 10 minutes, red in the last 5, then a still blue robot with a turning snowflake. The cache is assumed to live an hour from the last main-thread request.
 - Times: `4h53m`, `53m`, `4d2h`.
-- Narrow windows: whole figures wrap to a second line; the chevron stays right.
+- Narrow windows: once context is a ring, whole figures wrap to a second line; the chevron stays right.
 - Terminal: the same facts as one line of text.
 
 ## Card
