@@ -10,11 +10,11 @@ import type { Warmth } from './format.ts'
 export type Shade = { light: string; dark: string }
 
 const STOPS: { at: number; light: string; dark: string }[] = [
-  { at: 60, light: '#34a560', dark: '#5cb87a' }, // green
-  { at: 70, light: '#e8b100', dark: '#d9c84a' }, // yellow
-  { at: 80, light: '#f2a503', dark: '#e2a93b' }, // amber
-  { at: 85, light: '#f47230', dark: '#e0814f' }, // orange
-  { at: 90, light: '#e5484d', dark: '#ec6d66' }, // red
+  { at: 75, light: '#34a560', dark: '#5cb87a' }, // green
+  { at: 80, light: '#e8b100', dark: '#d9c84a' }, // yellow
+  { at: 85, light: '#f2a503', dark: '#e2a93b' }, // amber
+  { at: 90, light: '#f47230', dark: '#e0814f' }, // orange
+  { at: 95, light: '#e5484d', dark: '#ec6d66' }, // red
 ]
 
 const COLD: Shade = { light: '#2f6f95', dark: '#74b3cc' }
@@ -105,8 +105,8 @@ export const textOf = (shade: Shade) => `light-dark(${deepen(shade.light)}, ${sh
 
 /** The cache's colours: green while warm, orange in its last 10 minutes, red in its last 5, then blue. */
 export const warmthShade = (w: Warmth): Shade =>
-  w === 'cold' ? COLD : ringOf(w === 'ok' ? 0 : w === 'hi' ? 85 : 100)
+  w === 'cold' ? COLD : ringOf(w === 'ok' ? 0 : w === 'hi' ? 90 : 100)
 
 /** The terminal draws no blended colours: theme keys in four steps. */
 export const termKey = (percent: number) =>
-  percent >= 90 ? 'error' : percent >= 85 ? 'claude' : percent >= 70 ? 'warning' : 'success'
+  percent >= 95 ? 'error' : percent >= 90 ? 'claude' : percent >= 80 ? 'warning' : 'success'
