@@ -129,6 +129,11 @@ export const register: Register = on => {
     void measureBreakdown($)
     // Redraw each minute so times left and the cache's warmth stay current.
     $.clock.every(60_000, () => $.ui.invalidate('ui.render'))
+    // Re-read the limits too, so a tick from another session or the app shows without waiting for a response.
+    $.clock.every(15_000, async () => {
+      const fresh = await $.session.usage()
+      await update($, limits, () => keepLimits(fresh.rateLimits))
+    })
 
     return result
   })
